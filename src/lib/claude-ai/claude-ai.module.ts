@@ -1,11 +1,11 @@
 import { Global, Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
-import { AiService } from './ai.service';
+import { ClaudeAiService } from './claude-ai.service';
 
 @Global()
 @Module({
   imports: [DatabaseModule],
-  providers: [AiService],
-  exports: [AiService],
+  providers: [ClaudeAiService],
+  exports: [ClaudeAiService],
 })
-export class AiModule {}
+export class ClaudeAiModule {}
