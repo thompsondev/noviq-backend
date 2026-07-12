@@ -1,7 +1,7 @@
 {
-  "name": "aios",
+  "name": "noviq-backend",
   "version": "0.0.1",
-  "description": "",
+  "description": "Noviq backend API — AI employees for revenue growth",
   "author": "",
   "private": true,
   "license": "MIT",

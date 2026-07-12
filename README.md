@@ -1,6 +1,6 @@
-# AIOS
+# Noviq Backend
 
-A NestJS API backend that exposes an AI-powered assistant through a REST API. It calls Claude directly via the official Anthropic SDK, and uses PostgreSQL (TypeORM). The system prompt and branding are customizable, so you can adapt it for your own product or use it as a starter for an AI-backed API.
+Backend API for **Noviq** — AI Employees for Revenue Growth. This service is the current MVP: a NestJS API that exposes an AI-powered assistant, backed by PostgreSQL (TypeORM) and Claude via the official Anthropic SDK. It's the foundation the fuller Noviq platform (company discovery, research, personalized content generation, outreach, CRM, and specialized AI agents) will be built on top of.
 
 ## Features
 
@@ -24,7 +24,7 @@ A NestJS API backend that exposes an AI-powered assistant through a REST API. It
 
 ## Prerequisites
 
-- **Node.js** 18+
+- **Node.js** 22.10.7+ (see `engines` in `package.json`)
 - **pnpm** (recommended) or npm/yarn
 - **PostgreSQL** (local or remote)
 - **Anthropic API key**
@@ -45,15 +45,15 @@ cp .env.example .env
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `DATABASE_URL` | Yes | PostgreSQL connection string (e.g. `postgresql://user:pass@localhost:5432/aios`) |
+| `DATABASE_URL` | Yes | PostgreSQL connection string (e.g. `postgresql://user:pass@localhost:5432/noviq`) |
 | `ANTHROPIC_API_KEY` | Yes | API key for Claude |
 | `ANTHROPIC_MODEL` | No | Model identifier (default: `claude-sonnet-5`) |
 | `PORT` | No | Server port (default: `3000`) |
 | `API_KEY` | No | If set, all routes require an `x-api-key: <value>` header. Omit or leave blank for open access. |
 | `DOMAIN_CHAT` | No | When `API_KEY` is not set: comma-separated list of hostnames that get a per-day-per-IP limit (request `Host` must match one). Only these domains are limited; all other domains are **unlimited**. Omit for unlimited everywhere. |
 | `PROMPTS_PER_DAY_CHAT` | No | For domains listed in `DOMAIN_CHAT`, this many prompts per day per IP (default **5**). Ignored if `DOMAIN_CHAT` is not set. |
-| `PLATFORM_NAME` | No | Name used in API docs title (e.g. your product name) |
-| `PLATFORM_URL` | No | Main app URL (for API docs). Also used for branding: copyright is shown on localhost and when the request host is the same as or a subdomain of this URL’s host; otherwise it is hidden. |
+| `PLATFORM_NAME` | No | Name used in API docs title (default: `Noviq`) |
+| `PLATFORM_URL` | No | Main app URL (for API docs). Also used for branding: copyright is shown on localhost and when the request host is the same as or a subdomain of this URL's host; otherwise it is hidden. |
 | `DEVELOPMENT_URL` | No | Dev server host (for API docs) |
 | `PRODUCTION_URL` | No | Production host (for API docs) |
 | `AUTHOR_NAME` | No | Author handle shown in the demo UI header ("by X") and footer when the request is from `PLATFORM_URL` or a subdomain; omit to hide both |
@@ -142,7 +142,18 @@ src/
 └── main.ts              # Bootstrap, static files, Scalar API docs, CORS, rate limit
 ```
 
-To change the assistant’s personality and scope, edit the system prompt in `src/lib/claude-ai/sp.ts`.
+To change the assistant's personality and scope, edit the system prompt in `src/lib/claude-ai/sp.ts`.
+
+## Roadmap
+
+This repo currently implements the chat/AI foundation only. Per the Noviq product plan, upcoming modules include:
+
+- **Noviq Discover** — company discovery
+- **Noviq Intelligence** — AI company research
+- **Noviq Studio** — AI-generated UGC, ads, images, landing pages
+- **Noviq Reach** — email and LinkedIn outreach campaigns
+- **Noviq CRM** — deals, companies, pipeline
+- **Noviq Agents** — Research, Sales, Marketing, and Content agents plus an Executive Assistant
 
 ## Scripts reference
 
