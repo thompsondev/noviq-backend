@@ -4,10 +4,12 @@ Backend API for **Noviq** — AI Employees for Revenue Growth. This service is t
 
 ## Features
 
+- **Auth** – `modules/auth`: signup, email OTP verification, resend-OTP (60s cooldown), signin, forgot/reset password, logout — httpOnly-cookie sessions backed by Redis, bcrypt-hashed passwords. `GET /v1/user/session` reads the current session. No email provider is wired up yet — OTP/reset codes are logged server-side (`src/lib/email/email.service.ts`) instead of emailed
+- **Companies / Discover** – `modules/companies`: `POST /v1/companies/search` (org-scoped, domain-deduped) and `GET /v1/companies`, both behind session auth. No company data provider is wired into `CompanySourceService` yet, so search always returns zero new companies until one is picked
 - **AI chat endpoint** – `POST /v1/chat/prompt` returns a complete AI-generated text response
 - **Streaming endpoint** – `POST /v1/chat/prompt/stream` streams the AI response as SSE (`text/event-stream`); emits `text` delta events → `done`
 - **Configurable AI** – Calls Claude directly via [`@anthropic-ai/sdk`](https://github.com/anthropics/anthropic-sdk-typescript); model and API key via env
-- **Optional API key auth** – Set `API_KEY` in env to require an `x-api-key` header on all routes; omit for open access. When open access: only domains listed in `DOMAIN_CHAT` (one or more, comma-separated) have a per-day-per-IP limit (default **5**, or `PROMPTS_PER_DAY_CHAT`); all other domains are **unlimited**. Omit `DOMAIN_CHAT` for unlimited prompts everywhere.
+- **Optional API key auth** – Set `API_KEY` in env to require an `x-api-key` header on all routes; omit for open access. When open access: only domains listed in `DOMAIN_CHAT` (one or more, comma-separated) have a per-day-per-IP limit (default **5**, or `PROMPTS_PER_DAY_CHAT`); all other domains are **unlimited**. Omit `DOMAIN_CHAT` for unlimited prompts everywhere. Orthogonal to the per-user session auth above.
 - **Demo page** – Root URL serves a streaming chat UI (`public/index.html`): prompt box, Enter to send, Shift+Enter for new line, paste-to-attachment for long text
 - **API docs** – [Scalar](https://scalar.com/) API reference at `/v1/docs` with configurable servers and Bearer auth
 - **Security** – Helmet, rate limiting, CORS, global validation pipe, and a custom exception filter
@@ -18,9 +20,10 @@ Backend API for **Noviq** — AI Employees for Revenue Growth. This service is t
 
 - [NestJS](https://nestjs.com/) 11
 - [TypeORM](https://typeorm.io/) (PostgreSQL)
+- [Redis](https://redis.io/) (`ioredis`) — sessions, OTP codes, password reset codes
 - [Anthropic SDK](https://github.com/anthropics/anthropic-sdk-typescript) (`@anthropic-ai/sdk`) — direct Claude integration
 - [Scalar](https://scalar.com/) + [NestJS Swagger](https://docs.nestjs.com/openapi/introduction) (OpenAPI)
-- TypeScript, class-validator, class-transformer, Winston
+- TypeScript, class-validator, class-transformer, Winston, bcrypt
 
 ## Prerequisites
 
@@ -46,9 +49,11 @@ cp .env.example .env
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | PostgreSQL connection string (e.g. `postgresql://user:pass@localhost:5432/noviq`) |
+| `REDIS_URL` | Yes | Redis connection string — required for auth sessions, OTP, and password reset codes |
 | `ANTHROPIC_API_KEY` | Yes | API key for Claude |
 | `ANTHROPIC_MODEL` | No | Model identifier (default: `claude-sonnet-5`) |
 | `PORT` | No | Server port (default: `3000`) |
+| `NODE_ENV` | No | Set to `production` to mark the session cookie `Secure` (HTTPS only) |
 | `API_KEY` | No | If set, all routes require an `x-api-key: <value>` header. Omit or leave blank for open access. |
 | `DOMAIN_CHAT` | No | When `API_KEY` is not set: comma-separated list of hostnames that get a per-day-per-IP limit (request `Host` must match one). Only these domains are limited; all other domains are **unlimited**. Omit for unlimited everywhere. |
 | `PROMPTS_PER_DAY_CHAT` | No | For domains listed in `DOMAIN_CHAT`, this many prompts per day per IP (default **5**). Ignored if `DOMAIN_CHAT` is not set. |
@@ -108,6 +113,8 @@ pnpm run test:cov
 
 - **Server** – `GET /v1` – Health / hello
 - **Branding** – `GET /v1/branding` – Returns `{ authorName, authorUrl }` on localhost or when the request host is the same as or a subdomain of `PLATFORM_URL`; otherwise returns nulls (copyright hidden). Used by the demo UI to hydrate the header and footer.
+- **Auth** – `POST /v1/auth/{signup,verify,resend-otp,signin,forgot,reset,logout}`, `GET /v1/user/session` – see [docs/10-api-specification.md](../docs/10-api-specification.md) for the full contract
+- **Companies** – `POST /v1/companies/search`, `GET /v1/companies` – session-gated, org-scoped
 - **Chat** – `POST /v1/chat/prompt` – Body: `{ "prompt": "string" }` – Returns a complete AI-generated text response
 - **Chat (Claude direct)** – `POST /v1/chat/prompt/claude` – Body: `{ "prompt": "string" }` – Same backend as `/prompt`
 - **Chat (stream)** – `POST /v1/chat/prompt/stream` – Body: `{ "prompt": "string", "history"?: [...], "attachments"?: [...] }` – Streams the response as `text/event-stream` SSE
@@ -132,28 +139,33 @@ src/
 ├── app/                 # App module, controller, service
 ├── lib/                 # Shared libs
 │   ├── claude-ai/       # Claude service (Anthropic SDK), system prompt (sp.ts), tools (database, media)
+│   ├── company-source/ # Pluggable company data provider (no provider wired in yet)
 │   ├── database/        # TypeORM data source, entities, migrations
+│   ├── email/           # Email sender (logs OTP/reset codes — no provider wired in yet)
 │   ├── loggger/         # Custom logger
 │   ├── google/          # Google Sheets client
-│   └── redis/           # Redis service
-├── middleware/          # Exception filter, API key guard, open-access limit guard, decorators
+│   └── redis/           # Redis service (sessions, OTP, reset codes)
+├── middleware/          # Exception filter, API key guard, session guard, current-user decorator
 ├── modules/
+│   ├── auth/            # Auth + user session controllers/service
+│   ├── companies/       # Discover: search + list
 │   └── chat/            # Chat controller & service (prompt, stream)
-└── main.ts              # Bootstrap, static files, Scalar API docs, CORS, rate limit
+└── main.ts              # Bootstrap, static files, Scalar API docs, CORS, rate limit, cookie parser
 ```
 
 To change the assistant's personality and scope, edit the system prompt in `src/lib/claude-ai/sp.ts`.
 
 ## Roadmap
 
-This repo currently implements the chat/AI foundation only. Per the Noviq product plan, upcoming modules include:
+Auth and a scaffolded Discover (company search, no data provider yet) are implemented. Per the Noviq product plan, upcoming modules include:
 
-- **Noviq Discover** — company discovery
 - **Noviq Intelligence** — AI company research
 - **Noviq Studio** — AI-generated UGC, ads, images, landing pages
 - **Noviq Reach** — email and LinkedIn outreach campaigns
 - **Noviq CRM** — deals, companies, pipeline
 - **Noviq Agents** — Research, Sales, Marketing, and Content agents plus an Executive Assistant
+
+See [docs/12-roadmap.md](../docs/12-roadmap.md) for the full build order and current status.
 
 ## Scripts reference
 

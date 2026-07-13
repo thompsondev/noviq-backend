@@ -4,9 +4,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ChatMessage } from './entities/chat-message.entity';
 import { Organization } from './entities/organization.entity';
 import { User } from './entities/user.entity';
+import { Company } from './entities/company.entity';
 import { DatabaseService } from './database.service';
 
-const entities = [ChatMessage, Organization, User];
+const entities = [ChatMessage, Organization, User, Company];
 
 @Global()
 @Module({
