@@ -180,6 +180,8 @@ export class ClaudeAiService {
         type: 'web_search_20260318',
         name: 'web_search',
         max_uses: options?.maxSearches ?? 5,
+        // Some models (e.g. Haiku) require this explicitly for web_search.
+        allowed_callers: ['direct'],
       },
     ];
 
@@ -191,10 +193,15 @@ export class ClaudeAiService {
       tools,
     });
 
-    return response.content
-      .filter((block) => block.type === 'text')
-      .map((block) => block.text)
-      .join('\n');
+    // Web search is resolved server-side within this one response, so
+    // `content` can contain an earlier "I'll search for..." text block
+    // before the tool-use/result blocks, followed by the real synthesized
+    // answer. Only the last text block is the actual answer — concatenating
+    // all of them corrupts a JSON-only response with that leading commentary.
+    const textBlocks = response.content.filter(
+      (block) => block.type === 'text',
+    );
+    return textBlocks.length ? textBlocks[textBlocks.length - 1].text : '';
   }
 
   async generateResponse(userPrompt: string): Promise<string> {

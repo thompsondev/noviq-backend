@@ -58,13 +58,23 @@ function sanitizeDomain(domain: string): string {
     .toLowerCase();
 }
 
-function parseResults(raw: string): CompanySourceResult[] {
-  const jsonText = raw
-    .trim()
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/```\s*$/i, '')
-    .trim();
+/**
+ * Models don't reliably follow "respond with ONLY JSON" — a lead-in like
+ * "Based on my search, here are the companies:" before the array is common
+ * even after web search resolves. Extract by bracket position instead of
+ * trusting the whole response is valid JSON on its own.
+ */
+function extractJsonArray(text: string): string {
+  const start = text.indexOf('[');
+  const end = text.lastIndexOf(']');
+  if (start === -1 || end === -1 || end < start) {
+    throw new Error('No JSON array found in response');
+  }
+  return text.slice(start, end + 1);
+}
 
+function parseResults(raw: string): CompanySourceResult[] {
+  const jsonText = extractJsonArray(raw.trim());
   const parsed: unknown = JSON.parse(jsonText);
   if (!Array.isArray(parsed)) {
     throw new Error('Expected a JSON array');
