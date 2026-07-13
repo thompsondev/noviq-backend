@@ -5,9 +5,18 @@ import { ChatMessage } from './entities/chat-message.entity';
 import { Organization } from './entities/organization.entity';
 import { User } from './entities/user.entity';
 import { Company } from './entities/company.entity';
+import { CompanyIntelligence } from './entities/company-intelligence.entity';
+import { AgentRun } from './entities/agent-run.entity';
 import { DatabaseService } from './database.service';
 
-const entities = [ChatMessage, Organization, User, Company];
+const entities = [
+  ChatMessage,
+  Organization,
+  User,
+  Company,
+  CompanyIntelligence,
+  AgentRun,
+];
 
 @Global()
 @Module({

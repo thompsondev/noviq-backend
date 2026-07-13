@@ -204,6 +204,47 @@ export class ClaudeAiService {
     return textBlocks.length ? textBlocks[textBlocks.length - 1].text : '';
   }
 
+  /**
+   * Grounds a response in Anthropic's server-side web fetch tool — used
+   * wherever the answer must reflect a specific real page's actual content
+   * (e.g. researching a company from its own website) rather than the
+   * model's general knowledge.
+   */
+  async generateWithWebFetch(
+    prompt: string,
+    options?: {
+      system?: string;
+      maxFetches?: number;
+      allowedDomains?: string[];
+    },
+  ): Promise<string> {
+    const client = this.requireClient();
+    const tools: Anthropic.ToolUnion[] = [
+      {
+        type: 'web_fetch_20260318',
+        name: 'web_fetch',
+        max_uses: options?.maxFetches ?? 3,
+        allowed_callers: ['direct'],
+        ...(options?.allowedDomains
+          ? { allowed_domains: options.allowedDomains }
+          : {}),
+      },
+    ];
+
+    const response = await client.messages.create({
+      model: this.getModel(),
+      max_tokens: MAX_TOKENS,
+      system: options?.system,
+      messages: [{ role: 'user', content: prompt }],
+      tools,
+    });
+
+    const textBlocks = response.content.filter(
+      (block) => block.type === 'text',
+    );
+    return textBlocks.length ? textBlocks[textBlocks.length - 1].text : '';
+  }
+
   async generateResponse(userPrompt: string): Promise<string> {
     return this.generateText([{ role: 'user', content: userPrompt }]);
   }
