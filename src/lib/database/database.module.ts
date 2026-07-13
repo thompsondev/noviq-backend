@@ -2,7 +2,11 @@ import { Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ChatMessage } from './entities/chat-message.entity';
+import { Organization } from './entities/organization.entity';
+import { User } from './entities/user.entity';
 import { DatabaseService } from './database.service';
+
+const entities = [ChatMessage, Organization, User];
 
 @Global()
 @Module({
@@ -13,12 +17,12 @@ import { DatabaseService } from './database.service';
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
         url: config.get<string>('DATABASE_URL'),
-        entities: [ChatMessage],
+        entities,
         synchronize: false,
         migrationsRun: false,
       }),
     }),
-    TypeOrmModule.forFeature([ChatMessage]),
+    TypeOrmModule.forFeature(entities),
   ],
   providers: [DatabaseService],
   exports: [DatabaseService, TypeOrmModule],
