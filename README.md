@@ -5,7 +5,7 @@ Backend API for **Noviq** — AI Employees for Revenue Growth. This service is t
 ## Features
 
 - **Auth** – `modules/auth`: signup, email OTP verification, resend-OTP (60s cooldown), signin, forgot/reset password, logout — httpOnly-cookie sessions backed by Redis, bcrypt-hashed passwords. `GET /v1/user/session` reads the current session. No email provider is wired up yet — OTP/reset codes are logged server-side (`src/lib/email/email.service.ts`) instead of emailed
-- **Companies / Discover** – `modules/companies`: `POST /v1/companies/search` (org-scoped, domain-deduped) and `GET /v1/companies`, both behind session auth. No company data provider is wired into `CompanySourceService` yet, so search always returns zero new companies until one is picked
+- **Companies / Discover** – `modules/companies`: `POST /v1/companies/search` (org-scoped, domain-deduped) and `GET /v1/companies`, both behind session auth. Company data comes from Claude's web search tool (`CompanySourceService` → `ClaudeAiService.generateWithWebSearch`) rather than a paid provider — results must come from an actual search hit, never fabricated; a failed/unavailable search degrades to an empty list
 - **AI chat endpoint** – `POST /v1/chat/prompt` returns a complete AI-generated text response
 - **Streaming endpoint** – `POST /v1/chat/prompt/stream` streams the AI response as SSE (`text/event-stream`); emits `text` delta events → `done`
 - **Configurable AI** – Calls Claude directly via [`@anthropic-ai/sdk`](https://github.com/anthropics/anthropic-sdk-typescript); model and API key via env
@@ -139,7 +139,7 @@ src/
 ├── app/                 # App module, controller, service
 ├── lib/                 # Shared libs
 │   ├── claude-ai/       # Claude service (Anthropic SDK), system prompt (sp.ts), tools (database, media)
-│   ├── company-source/ # Pluggable company data provider (no provider wired in yet)
+│   ├── company-source/ # Company discovery via Claude's web search tool
 │   ├── database/        # TypeORM data source, entities, migrations
 │   ├── email/           # Email sender (logs OTP/reset codes — no provider wired in yet)
 │   ├── loggger/         # Custom logger

@@ -165,6 +165,38 @@ export class ClaudeAiService {
     return finalText || 'I ran out of steps trying to answer that.';
   }
 
+  /**
+   * Grounds a response in Anthropic's server-side web search tool rather
+   * than the model's own (fabrication-prone) knowledge — used wherever the
+   * answer must reflect real, current web content, e.g. company discovery.
+   */
+  async generateWithWebSearch(
+    prompt: string,
+    options?: { system?: string; maxSearches?: number },
+  ): Promise<string> {
+    const client = this.requireClient();
+    const tools: Anthropic.ToolUnion[] = [
+      {
+        type: 'web_search_20260318',
+        name: 'web_search',
+        max_uses: options?.maxSearches ?? 5,
+      },
+    ];
+
+    const response = await client.messages.create({
+      model: this.getModel(),
+      max_tokens: MAX_TOKENS,
+      system: options?.system,
+      messages: [{ role: 'user', content: prompt }],
+      tools,
+    });
+
+    return response.content
+      .filter((block) => block.type === 'text')
+      .map((block) => block.text)
+      .join('\n');
+  }
+
   async generateResponse(userPrompt: string): Promise<string> {
     return this.generateText([{ role: 'user', content: userPrompt }]);
   }
