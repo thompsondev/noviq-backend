@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ClaudeAiService } from '../claude-ai/claude-ai.service';
+import { extractJsonArray } from '../claude-ai/extract-json';
 
 export interface CompanySearchQuery {
   keyword?: string;
@@ -56,21 +57,6 @@ function sanitizeDomain(domain: string): string {
     .replace(/^www\./, '')
     .replace(/\/.*$/, '')
     .toLowerCase();
-}
-
-/**
- * Models don't reliably follow "respond with ONLY JSON" — a lead-in like
- * "Based on my search, here are the companies:" before the array is common
- * even after web search resolves. Extract by bracket position instead of
- * trusting the whole response is valid JSON on its own.
- */
-function extractJsonArray(text: string): string {
-  const start = text.indexOf('[');
-  const end = text.lastIndexOf(']');
-  if (start === -1 || end === -1 || end < start) {
-    throw new Error('No JSON array found in response');
-  }
-  return text.slice(start, end + 1);
 }
 
 function parseResults(raw: string): CompanySourceResult[] {

@@ -8,7 +8,7 @@ import {
   PrimaryColumn,
 } from 'typeorm';
 
-export type AgentType = 'research';
+export type AgentType = 'research' | 'content';
 export type AgentRunStatus = 'running' | 'completed' | 'failed';
 
 @Entity('AgentRun')

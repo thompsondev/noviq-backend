@@ -6,6 +6,7 @@ Backend API for **Noviq** — AI Employees for Revenue Growth. This service is t
 
 - **Auth** – `modules/auth`: signup, email OTP verification, resend-OTP (60s cooldown), signin, forgot/reset password, logout — httpOnly-cookie sessions backed by Redis, bcrypt-hashed passwords. `GET /v1/user/session` reads the current session. No email provider is wired up yet — OTP/reset codes are logged server-side (`src/lib/email/email.service.ts`) instead of emailed
 - **Companies / Discover** – `modules/companies`: `POST /v1/companies/search` (org-scoped, domain-deduped) and `GET /v1/companies`, both behind session auth. Company data comes from Claude's web search tool (`CompanySourceService` → `ClaudeAiService.generateWithWebSearch`) rather than a paid provider — results must come from an actual search hit, never fabricated; a failed/unavailable search degrades to an empty list
+- **Research Agent** – `modules/agents`: `POST /v1/companies/:id/research` fetches a company's real website via Claude's web fetch tool (`ClaudeAiService.generateWithWebFetch`) and extracts products/pricing/competitors/tech stack/pain points — never fabricated, 24h freshness cache, bounded retries (2 attempts). `GET /v1/agents/runs` / `/:id` expose a generic `AgentRun` monitoring surface shared by future agent types
 - **AI chat endpoint** – `POST /v1/chat/prompt` returns a complete AI-generated text response
 - **Streaming endpoint** – `POST /v1/chat/prompt/stream` streams the AI response as SSE (`text/event-stream`); emits `text` delta events → `done`
 - **Configurable AI** – Calls Claude directly via [`@anthropic-ai/sdk`](https://github.com/anthropics/anthropic-sdk-typescript); model and API key via env
@@ -114,7 +115,8 @@ pnpm run test:cov
 - **Server** – `GET /v1` – Health / hello
 - **Branding** – `GET /v1/branding` – Returns `{ authorName, authorUrl }` on localhost or when the request host is the same as or a subdomain of `PLATFORM_URL`; otherwise returns nulls (copyright hidden). Used by the demo UI to hydrate the header and footer.
 - **Auth** – `POST /v1/auth/{signup,verify,resend-otp,signin,forgot,reset,logout}`, `GET /v1/user/session` – see [docs/10-api-specification.md](../docs/10-api-specification.md) for the full contract
-- **Companies** – `POST /v1/companies/search`, `GET /v1/companies` – session-gated, org-scoped
+- **Companies** – `POST /v1/companies/search`, `GET /v1/companies`, `POST /v1/companies/:id/research` – session-gated, org-scoped
+- **Agents** – `GET /v1/agents/runs`, `GET /v1/agents/runs/:id` – agent run monitoring, session-gated, org-scoped
 - **Chat** – `POST /v1/chat/prompt` – Body: `{ "prompt": "string" }` – Returns a complete AI-generated text response
 - **Chat (Claude direct)** – `POST /v1/chat/prompt/claude` – Body: `{ "prompt": "string" }` – Same backend as `/prompt`
 - **Chat (stream)** – `POST /v1/chat/prompt/stream` – Body: `{ "prompt": "string", "history"?: [...], "attachments"?: [...] }` – Streams the response as `text/event-stream` SSE
@@ -148,7 +150,8 @@ src/
 ├── middleware/          # Exception filter, API key guard, session guard, current-user decorator
 ├── modules/
 │   ├── auth/            # Auth + user session controllers/service
-│   ├── companies/       # Discover: search + list
+│   ├── agents/          # Generic AgentRun tracking + Research Agent
+│   ├── companies/       # Discover: search + list + per-company research
 │   └── chat/            # Chat controller & service (prompt, stream)
 └── main.ts              # Bootstrap, static files, Scalar API docs, CORS, rate limit, cookie parser
 ```
@@ -157,13 +160,12 @@ To change the assistant's personality and scope, edit the system prompt in `src/
 
 ## Roadmap
 
-Auth and a scaffolded Discover (company search, no data provider yet) are implemented. Per the Noviq product plan, upcoming modules include:
+Auth, Discover (company search, grounded in Claude web search), and a Research Agent (grounded in Claude web fetch) are implemented — both confirmed working against real companies, not placeholders. Per the Noviq product plan, upcoming modules include:
 
-- **Noviq Intelligence** — AI company research
 - **Noviq Studio** — AI-generated UGC, ads, images, landing pages
 - **Noviq Reach** — email and LinkedIn outreach campaigns
 - **Noviq CRM** — deals, companies, pipeline
-- **Noviq Agents** — Research, Sales, Marketing, and Content agents plus an Executive Assistant
+- **More Noviq Agents** — Sales, Marketing, and Content agents plus an Executive Assistant (Research Agent is done)
 
 See [docs/12-roadmap.md](../docs/12-roadmap.md) for the full build order and current status.
 

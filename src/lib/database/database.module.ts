@@ -7,6 +7,7 @@ import { User } from './entities/user.entity';
 import { Company } from './entities/company.entity';
 import { CompanyIntelligence } from './entities/company-intelligence.entity';
 import { AgentRun } from './entities/agent-run.entity';
+import { GeneratedAsset } from './entities/generated-asset.entity';
 import { DatabaseService } from './database.service';
 
 const entities = [
@@ -16,6 +17,7 @@ const entities = [
   Company,
   CompanyIntelligence,
   AgentRun,
+  GeneratedAsset,
 ];
 
 @Global()

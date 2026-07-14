@@ -6,6 +6,7 @@ import { User } from './entities/user.entity';
 import { Company } from './entities/company.entity';
 import { CompanyIntelligence } from './entities/company-intelligence.entity';
 import { AgentRun } from './entities/agent-run.entity';
+import { GeneratedAsset } from './entities/generated-asset.entity';
 
 export default new DataSource({
   type: 'postgres',
@@ -17,6 +18,7 @@ export default new DataSource({
     Company,
     CompanyIntelligence,
     AgentRun,
+    GeneratedAsset,
   ],
   migrations: [__dirname + '/migrations/*{.ts,.js}'],
   synchronize: false,

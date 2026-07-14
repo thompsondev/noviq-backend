@@ -245,6 +245,31 @@ export class ClaudeAiService {
     return textBlocks.length ? textBlocks[textBlocks.length - 1].text : '';
   }
 
+  /**
+   * Plain generation with no tools and no system-prompt persona (unlike
+   * `generateResponse`, which uses the AIOS chat persona + db/media tools).
+   * For structured content generation from data already in hand — e.g.
+   * writing an email from a company's existing research — where nothing
+   * needs to be fetched live.
+   */
+  async generatePlain(
+    prompt: string,
+    options?: { system?: string },
+  ): Promise<string> {
+    const client = this.requireClient();
+    const response = await client.messages.create({
+      model: this.getModel(),
+      max_tokens: MAX_TOKENS,
+      system: options?.system,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const textBlocks = response.content.filter(
+      (block) => block.type === 'text',
+    );
+    return textBlocks.length ? textBlocks[textBlocks.length - 1].text : '';
+  }
+
   async generateResponse(userPrompt: string): Promise<string> {
     return this.generateText([{ role: 'user', content: userPrompt }]);
   }

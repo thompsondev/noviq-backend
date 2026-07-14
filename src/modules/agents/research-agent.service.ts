@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ClaudeAiService } from '../../lib/claude-ai/claude-ai.service';
+import { extractJsonObject } from '../../lib/claude-ai/extract-json';
 import { Company } from '../../lib/database/entities/company.entity';
 import { CompanyIntelligence } from '../../lib/database/entities/company-intelligence.entity';
 import { AgentRun } from '../../lib/database/entities/agent-run.entity';
@@ -28,15 +29,6 @@ Rules:
 - "techStack" are technologies you can actually detect from the fetched content (e.g. platform mentions, footer credits); omit if none detected
 - "painPoints" are customer problems the site's own messaging says it solves; omit if unclear
 - Respond with the JSON object and nothing else`;
-}
-
-function extractJsonObject(text: string): string {
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start === -1 || end === -1 || end < start) {
-    throw new Error('No JSON object found in response');
-  }
-  return text.slice(start, end + 1);
 }
 
 interface ParsedResearch {
