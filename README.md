@@ -4,9 +4,10 @@ Backend API for **Noviq** — AI Employees for Revenue Growth. This service is t
 
 ## Features
 
-- **Auth** – `modules/auth`: signup, email OTP verification, resend-OTP (60s cooldown), signin, forgot/reset password, logout — httpOnly-cookie sessions backed by Redis, bcrypt-hashed passwords. `GET /v1/user/session` reads the current session. No email provider is wired up yet — OTP/reset codes are logged server-side (`src/lib/email/email.service.ts`) instead of emailed
+- **Auth** – `modules/auth`: signup, email OTP verification, resend-OTP (60s cooldown), signin, forgot/reset password, logout — httpOnly-cookie sessions backed by Redis, bcrypt-hashed passwords. `GET /v1/user/session` reads the current session. Emails send via Resend or ZeptoMail, switched with one env var (`EMAIL_PROVIDER`) — see Email provider below; if unset, OTP/reset codes are logged server-side instead of emailed
 - **Companies / Discover** – `modules/companies`: `POST /v1/companies/search` (org-scoped, domain-deduped) and `GET /v1/companies`, both behind session auth. Company data comes from Claude's web search tool (`CompanySourceService` → `ClaudeAiService.generateWithWebSearch`) rather than a paid provider — results must come from an actual search hit, never fabricated; a failed/unavailable search degrades to an empty list
 - **Research Agent** – `modules/agents`: `POST /v1/companies/:id/research` fetches a company's real website via Claude's web fetch tool (`ClaudeAiService.generateWithWebFetch`) and extracts products/pricing/competitors/tech stack/pain points — never fabricated, 24h freshness cache, bounded retries (2 attempts). `GET /v1/agents/runs` / `/:id` expose a generic `AgentRun` monitoring surface shared by future agent types
+- **Email generation (Studio)** – `modules/assets`: `POST /v1/assets/generate` writes a personalized `GeneratedAsset` (email) from a company's completed research via `ClaudeAiService.generatePlain` — no web tools needed since it synthesizes from research already gathered. Blocks with a clear error if research isn't `completed` yet rather than generating a generic email. `GET /v1/assets` lists an org's generated assets
 - **AI chat endpoint** – `POST /v1/chat/prompt` returns a complete AI-generated text response
 - **Streaming endpoint** – `POST /v1/chat/prompt/stream` streams the AI response as SSE (`text/event-stream`); emits `text` delta events → `done`
 - **Configurable AI** – Calls Claude directly via [`@anthropic-ai/sdk`](https://github.com/anthropics/anthropic-sdk-typescript); model and API key via env
@@ -65,6 +66,22 @@ cp .env.example .env
 | `AUTHOR_NAME` | No | Author handle shown in the demo UI header ("by X") and footer when the request is from `PLATFORM_URL` or a subdomain; omit to hide both |
 | `AUTHOR_URL` | No | URL for the footer author link; only used when `AUTHOR_NAME` is set and branding is shown |
 | `CORS_ORIGINS` | No | Comma-separated list of extra allowed origins (e.g. `https://app.com,https://other.com`). All `http(s)://localhost` and `http(s)://127.0.0.1` ports are always allowed by default. |
+| `EMAIL_PROVIDER` | No | `resend` or `zeptomail`. Omit to log OTP/reset emails to the console instead of sending them (local dev). See [Email provider](#email-provider) below. |
+| `EMAIL_FROM` | If `EMAIL_PROVIDER` is set | Sender address, e.g. `noreply@yourdomain.com` |
+| `EMAIL_FROM_NAME` | No | Sender display name (e.g. `Noviq`) |
+| `RESEND_API_KEY` | If `EMAIL_PROVIDER=resend` | API key from the [Resend dashboard](https://resend.com/api-keys) |
+| `ZEPTOMAIL_API_TOKEN` | If `EMAIL_PROVIDER=zeptomail` | The full `Authorization` header value ZeptoMail gives you (starts with `Zoho-enczapikey `) |
+| `ZEPTOMAIL_API_URL` | No | Override for a non-default ZeptoMail region (default: `https://api.zeptomail.com/v1.1/email`) |
+
+## Email provider
+
+`EmailService` (`src/lib/email/email.service.ts`) sends every OTP/password-reset email in the app through one method, backed by a swappable provider:
+
+- **No provider configured** (`EMAIL_PROVIDER` unset): emails are logged to the server console instead of sent — this is the default and is fine for local dev
+- **Resend** (`EMAIL_PROVIDER=resend`): set `RESEND_API_KEY`, `EMAIL_FROM`
+- **ZeptoMail** (`EMAIL_PROVIDER=zeptomail`): set `ZEPTOMAIL_API_TOKEN`, `EMAIL_FROM`
+
+Switching providers is a one-line env change (`EMAIL_PROVIDER`) plus that provider's credentials — no code change. To add a third provider, implement `EmailProvider` (`src/lib/email/providers/email-provider.interface.ts`) and add one branch to `EmailService.buildProvider()`.
 
 ## Database
 
@@ -117,6 +134,7 @@ pnpm run test:cov
 - **Auth** – `POST /v1/auth/{signup,verify,resend-otp,signin,forgot,reset,logout}`, `GET /v1/user/session` – see [docs/10-api-specification.md](../docs/10-api-specification.md) for the full contract
 - **Companies** – `POST /v1/companies/search`, `GET /v1/companies`, `POST /v1/companies/:id/research` – session-gated, org-scoped
 - **Agents** – `GET /v1/agents/runs`, `GET /v1/agents/runs/:id` – agent run monitoring, session-gated, org-scoped
+- **Assets** – `POST /v1/assets/generate`, `GET /v1/assets` – Studio email generation, session-gated, org-scoped
 - **Chat** – `POST /v1/chat/prompt` – Body: `{ "prompt": "string" }` – Returns a complete AI-generated text response
 - **Chat (Claude direct)** – `POST /v1/chat/prompt/claude` – Body: `{ "prompt": "string" }` – Same backend as `/prompt`
 - **Chat (stream)** – `POST /v1/chat/prompt/stream` – Body: `{ "prompt": "string", "history"?: [...], "attachments"?: [...] }` – Streams the response as `text/event-stream` SSE
@@ -143,7 +161,7 @@ src/
 │   ├── claude-ai/       # Claude service (Anthropic SDK), system prompt (sp.ts), tools (database, media)
 │   ├── company-source/ # Company discovery via Claude's web search tool
 │   ├── database/        # TypeORM data source, entities, migrations
-│   ├── email/           # Email sender (logs OTP/reset codes — no provider wired in yet)
+│   ├── email/           # Email sender — providers/ (Resend, ZeptoMail), switched via EMAIL_PROVIDER
 │   ├── loggger/         # Custom logger
 │   ├── google/          # Google Sheets client
 │   └── redis/           # Redis service (sessions, OTP, reset codes)
@@ -152,6 +170,7 @@ src/
 │   ├── auth/            # Auth + user session controllers/service
 │   ├── agents/          # Generic AgentRun tracking + Research Agent
 │   ├── companies/       # Discover: search + list + per-company research
+│   ├── assets/          # Studio: email generation from a company's research
 │   └── chat/            # Chat controller & service (prompt, stream)
 └── main.ts              # Bootstrap, static files, Scalar API docs, CORS, rate limit, cookie parser
 ```
@@ -160,12 +179,12 @@ To change the assistant's personality and scope, edit the system prompt in `src/
 
 ## Roadmap
 
-Auth, Discover (company search, grounded in Claude web search), and a Research Agent (grounded in Claude web fetch) are implemented — both confirmed working against real companies, not placeholders. Per the Noviq product plan, upcoming modules include:
+Auth, Discover (company search, grounded in Claude web search), a Research Agent (grounded in Claude web fetch), and email generation (Noviq Studio, MVP scope) are implemented — all confirmed working against real companies, not placeholders. Per the Noviq product plan, upcoming modules include:
 
-- **Noviq Studio** — AI-generated UGC, ads, images, landing pages
-- **Noviq Reach** — email and LinkedIn outreach campaigns
+- **Noviq Studio** — beyond email: AI-generated UGC, ads, images, landing pages
+- **Noviq Reach** — email and LinkedIn outreach campaigns (email send is next up)
 - **Noviq CRM** — deals, companies, pipeline
-- **More Noviq Agents** — Sales, Marketing, and Content agents plus an Executive Assistant (Research Agent is done)
+- **More Noviq Agents** — Sales and an Executive Assistant (Research and Content/Marketing agents are done)
 
 See [docs/12-roadmap.md](../docs/12-roadmap.md) for the full build order and current status.
 
