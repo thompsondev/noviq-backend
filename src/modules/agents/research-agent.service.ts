@@ -64,7 +64,8 @@ function parseResearch(raw: string): ParsedResearch {
   const record = parsed as Record<string, unknown>;
 
   return {
-    status: record.status === 'insufficient_data' ? 'insufficient_data' : 'completed',
+    status:
+      record.status === 'insufficient_data' ? 'insufficient_data' : 'completed',
     summary: typeof record.summary === 'string' ? record.summary : null,
     products: toStringArray(record.products),
     pricing: typeof record.pricing === 'string' ? record.pricing : null,
@@ -170,8 +171,7 @@ export class ResearchAgentService {
     existing: CompanyIntelligence | null,
     parsed: ParsedResearch,
   ): Promise<CompanyIntelligence> {
-    const intelligence =
-      existing ?? this.intelRepo.create({ companyId });
+    const intelligence = existing ?? this.intelRepo.create({ companyId });
     intelligence.status = parsed.status;
     intelligence.summary = parsed.summary;
     intelligence.products = parsed.products;
